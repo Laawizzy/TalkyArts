@@ -39,91 +39,95 @@ button:hover,input:hover{background:#f5f5f5;}
 <div id="wordCount">Word count: 0</div>
 
 <script>
-let recorder, audioChunks=[], timer, time=0;
+let mediaRecorder, audioChunks=[], timer, time=0;
 
 // Fotoğraf ve soru
-function newPhoto(){
-  const url=`https://picsum.photos/600/400?random=${Math.random()*10000}`;
-  document.getElementById("photo").src=url;
-  const questions=["What do you see?", "What are the people doing?", "Where is this place?", "How do you feel?", "What might happen next?", "Describe colors and objects."];
-  document.getElementById("question").innerText=questions[Math.floor(Math.random()*questions.length)];
-  document.getElementById("speechText").innerText="";
-  document.getElementById("wordCount").innerText="Word count: 0";
-  const userTime=parseInt(document.getElementById("userTime").value);
-  document.getElementById("timer").innerText=userTime>0?userTime:"Please specify the timer";
-  document.getElementById("status").innerText="Restart";
+function newPhoto() {
+    const url = `https://picsum.photos/600/400?random=${Math.random()*10000}`;
+    document.getElementById("photo").src = url;
+    const questions = [
+        "What do you see?", "What are the people doing?",
+        "Where is this place?", "How do you feel?",
+        "What might happen next?", "Describe colors and objects."
+    ];
+    document.getElementById("question").innerText = questions[Math.floor(Math.random()*questions.length)];
+    document.getElementById("speechText").innerText = "";
+    document.getElementById("wordCount").innerText = "Word count: 0";
+    const userTime = parseInt(document.getElementById("userTime").value);
+    document.getElementById("timer").innerText = userTime>0 ? userTime : "Please specify the timer";
+    document.getElementById("status").innerText = "Restart";
 }
 
 // Timer
 function startTimer(duration){
-  clearInterval(timer);
-  time=duration;
-  document.getElementById("timer").innerText=time;
-  timer=setInterval(()=>{
-    time--;
-    document.getElementById("timer").innerText=time;
-    if(time<=0) stopSpeaking();
-  },1000);
+    clearInterval(timer);
+    time = duration;
+    document.getElementById("timer").innerText = time;
+    timer = setInterval(()=>{
+        time--;
+        document.getElementById("timer").innerText = time;
+        if(time<=0) stopSpeaking();
+    },1000);
 }
 
-// Start speaking + record audio
+// Start Speaking
 async function startSpeaking(){
-  const dur=parseInt(document.getElementById("userTime").value);
-  if(!dur || dur<1){
-    document.getElementById("timer").innerText="Please specify the timer";
-    alert("Please enter a valid timer first.");
-    return;
-  }
-
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    alert("Your browser does not support microphone access.");
-    return;
-  }
-
-  audioChunks=[];
-  const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-  recorder=new MediaRecorder(stream);
-  recorder.ondataavailable=e=>audioChunks.push(e.data);
-  recorder.onstop=async ()=>{
-    document.getElementById("status").innerText="Processing...";
-    const blob=new Blob(audioChunks,{type:"audio/webm"});
-    const formData=new FormData();
-    formData.append("file",blob,"speech.webm");
+    const dur = parseInt(document.getElementById("userTime").value);
+    if(!dur || dur<1){
+        document.getElementById("timer").innerText = "Please specify the timer";
+        alert("Please enter a valid timer.");
+        return;
+    }
 
     try{
-      const res=await fetch("/api/transcribe",{method:"POST",body:formData});
-      const data=await res.json();
-      const text=data.text;
-      document.getElementById("speechText").innerText=text;
-      document.getElementById("wordCount").innerText="Word count: "+text.trim().split(/\s+/).length;
-      document.getElementById("status").innerText="Done";
+        const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+        audioChunks=[];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = async ()=>{
+            const blob = new Blob(audioChunks,{type:'audio/webm'});
+            document.getElementById("status").innerText = "Processing...";
+            const form = new FormData();
+            form.append("audio", blob, "speech.webm");
+
+            try{
+                const res = await fetch("/api/transcribe", { method:"POST", body:form });
+                const data = await res.json();
+                const text = data.text;
+                document.getElementById("speechText").innerText = text;
+                document.getElementById("wordCount").innerText = "Word count: "+text.trim().split(/\s+/).length;
+                document.getElementById("status").innerText = "Done";
+            }catch(err){
+                document.getElementById("status").innerText = "Error sending audio";
+                console.error(err);
+            }
+        };
+        mediaRecorder.start();
+        document.getElementById("status").innerText = "Recording…";
+        startTimer(dur);
     }catch(err){
-      console.error(err);
-      document.getElementById("status").innerText="Error processing audio";
+        console.error(err);
+        alert("Microphone access denied or not supported.");
     }
-  };
-  recorder.start();
-  document.getElementById("status").innerText="Recording…";
-  startTimer(dur);
 }
 
-// Stop speaking
+// Stop Speaking
 function stopSpeaking(){
-  if(recorder && recorder.state==="recording"){
-    recorder.stop();
-    clearInterval(timer);
-    document.getElementById("status").innerText="Stopped";
-  }
+    if(mediaRecorder && mediaRecorder.state==="recording"){
+        mediaRecorder.stop();
+        clearInterval(timer);
+        document.getElementById("status").innerText = "Stopped";
+    }
 }
 
 // Restart
 function restart(){
-  stopSpeaking();
-  document.getElementById("speechText").innerText="Your speech will appear here...";
-  document.getElementById("wordCount").innerText="Word count: 0";
-  document.getElementById("status").innerText="Restart";
-  const userTime=parseInt(document.getElementById("userTime").value);
-  document.getElementById("timer").innerText=userTime>0?userTime:"Please specify the timer";
+    stopSpeaking();
+    document.getElementById("speechText").innerText = "Your speech will appear here...";
+    document.getElementById("wordCount").innerText = "Word count: 0";
+    document.getElementById("status").innerText = "Restart";
+    const userTime = parseInt(document.getElementById("userTime").value);
+    document.getElementById("timer").innerText = userTime>0 ? userTime : "Please specify the timer";
 }
 
 newPhoto();
