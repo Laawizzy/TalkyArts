@@ -80,29 +80,49 @@ async function startSpeaking(){
     }
 
     try{
-        const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+        // Gürültü engelleme ve yankı önleyici eklendi (Whisper daha iyi anlasın diye)
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: { echoCancellation: true, noiseSuppression: true } 
+        });
         audioChunks=[];
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        
+        // Telefonun (iPhone/Android) desteklediği formatı otomatik bul
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+        
+        mediaRecorder.ondataavailable = e => {
+            if (e.data.size > 0) audioChunks.push(e.data);
+        };
+        
         mediaRecorder.onstop = async ()=>{
-            const blob = new Blob(audioChunks,{type:'audio/webm'});
-            document.getElementById("status").innerText = "Processing...";
+            const blob = new Blob(audioChunks, { type: mimeType });
+            document.getElementById("status").innerText = "Processing with Whisper...";
+            
             const form = new FormData();
-            form.append("audio", blob, "speech.webm");
+            const ext = mimeType.includes('webm') ? 'webm' : 'm4a';
+            form.append("audio", blob, `speech.${ext}`);
 
             try{
                 const res = await fetch("/api/transcribe", { method:"POST", body:form });
                 const data = await res.json();
-                const text = data.text;
-                document.getElementById("speechText").innerText = text;
-                document.getElementById("wordCount").innerText = "Word count: "+text.trim().split(/\s+/).length;
-                document.getElementById("status").innerText = "Done";
+                
+                if(data.text) {
+                    const text = data.text;
+                    document.getElementById("speechText").innerText = text;
+                    document.getElementById("wordCount").innerText = "Word count: "+text.trim().split(/\s+/).length;
+                    document.getElementById("status").innerText = "Done";
+                } else {
+                    throw new Error(data.error || "Metin algılanamadı");
+                }
             }catch(err){
                 document.getElementById("status").innerText = "Error sending audio";
                 console.error(err);
+                alert("Hata detayı: " + err.message); // Mobilde hatayı görmek için
             }
         };
-        mediaRecorder.start();
+        
+        // Mobilde belleğin şişmemesi için sesi 1 saniyelik parçalarla kaydet
+        mediaRecorder.start(1000);
         document.getElementById("status").innerText = "Recording…";
         startTimer(dur);
     }catch(err){
@@ -116,7 +136,7 @@ function stopSpeaking(){
     if(mediaRecorder && mediaRecorder.state==="recording"){
         mediaRecorder.stop();
         clearInterval(timer);
-        document.getElementById("status").innerText = "Stopped";
+        document.getElementById("status").innerText = "Processing..."; // Kullanıcıya beklediğini hissettirir
     }
 }
 
