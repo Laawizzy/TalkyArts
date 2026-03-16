@@ -10,22 +10,37 @@ export const config = {
     api: { bodyParser: false }
 };
 
-export default async function handler(req, res){
-    const form = new formidable.IncomingForm();
-    form.parse(req, async (err, fields, files)=>{
-        if(err) return res.status(500).json({error: err.message});
+export default async function handler(req, res) {
+    // Sadece POST isteklerini kabul et
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: "Method not allowed" });
+    }
 
-        const file = files.audio.filepath;
-        try{
+    const form = new formidable.IncomingForm();
+    
+    form.parse(req, async (err, fields, files) => {
+        if (err) {
+            console.error("Form Parse Hatası:", err);
+            return res.status(500).json({ error: "Dosya okuma hatası" });
+        }
+
+        // Mobilde dosya gelip gelmediğini kontrol edelim
+        const audioFile = files.audio?.[0] || files.audio; 
+        if (!audioFile) {
+            return res.status(400).json({ error: "Ses dosyası bulunamadı" });
+        }
+
+        try {
             const transcription = await openai.audio.transcriptions.create({
-                file: fs.createReadStream(file),
+                file: fs.createReadStream(audioFile.filepath),
                 model: "whisper-1",
                 language: "en"
             });
+            
             res.status(200).json({ text: transcription.text });
-        }catch(e){
-            console.error(e);
-            res.status(500).json({ error: "Whisper transcription failed" });
+        } catch (e) {
+            console.error("OpenAI Hatası:", e.message);
+            res.status(500).json({ error: e.message });
         }
     });
 }
