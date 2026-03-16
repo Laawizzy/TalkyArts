@@ -1,9 +1,9 @@
 {
-  "name": "talkyarts",
+  "name": "talkyart",
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "openai": "^4.0.0",
-    "formidable": "^3.0.0"
+    "openai": "^4.56.0",
+    "formidable": "^3.5.1"
   }
 }
