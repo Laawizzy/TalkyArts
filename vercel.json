@@ -1,10 +1,5 @@
 {
-  "version": 2,
-  "builds": [
-    { "src": "api/transcribe.js", "use": "@vercel/node" },
-    { "src": "index.html", "use": "@vercel/static" }
-  ],
-  "routes": [
-    { "src": "/api/transcribe", "dest": "api/transcribe.js" }
+  "rewrites": [
+    { "source": "/api/transcribe", "destination": "/api/transcribe.js" }
   ]
 }
